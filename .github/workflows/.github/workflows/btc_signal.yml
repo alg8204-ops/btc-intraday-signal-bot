@@ -1,1 +1,55 @@
+name: BTC Signal Bot
 
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install pandas numpy requests yfinance ta
+          fi
+
+      - name: Localizar script del bot
+        id: script
+        run: |
+          echo "Archivos Python encontrados:"
+          find . -type f -name "*.py" -not -path "./.git/*"
+
+          SCRIPT=$(find . -type f -name "*.py" -not -path "./.git/*" | grep -Ei 'RVC6|SIGNAL|BTC|BOT' | head -n 1)
+
+          if [ -z "$SCRIPT" ]; then
+            SCRIPT=$(find . -type f -name "*.py" -not -path "./.git/*" | head -n 1)
+          fi
+
+          if [ -z "$SCRIPT" ]; then
+            echo "ERROR: No se ha encontrado ningún archivo Python."
+            exit 1
+          fi
+
+          echo "Script seleccionado: $SCRIPT"
+          echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
+
+      - name: Ejecutar bot
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          printf '%s\n%s\n' "$TOKEN" "$CHAT_ID" | python "${{ steps.script.outputs.script }}"
